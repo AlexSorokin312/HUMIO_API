@@ -1,4 +1,5 @@
-﻿using HUMIO_API.Model;
+﻿using HUMIO_API.Requests;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,6 +7,7 @@ namespace HUMIO_API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    //[Authorize] 
     public class UserController : ControllerBase
     {
         private readonly UserManager<User> _userManager;
@@ -16,7 +18,7 @@ namespace HUMIO_API.Controllers
         }
 
         /// <summary>
-        /// ✅ Получить пользователя по email
+        /// Получить пользователя по email (только для аутентифицированных)
         /// </summary>
         [HttpGet("by-email/{email}")]
         public async Task<IActionResult> GetUserByEmail(string email)
@@ -27,19 +29,53 @@ namespace HUMIO_API.Controllers
                 return NotFound($"Пользователь с email {email} не найден.");
             }
 
-            return Ok(new
+            var response = new UserResponse
             {
-                user.Id,
-                user.UserName,
-                user.Email,
-                user.Country
-            });
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+            };
+
+            return Ok(response);
         }
 
         /// <summary>
-        /// ✅ Получить всех администраторов
+        /// Получить пользователя по id (только для аутентифицированных)
+        /// </summary>
+        [HttpGet("by-id/{id}")]
+        public async Task<IActionResult> GetUserById(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound($"Пользователь с id {id} не найден.");
+            }
+
+            var response = new UserResponse
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+            };
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Получить всех пользователей из заданной страны (только для аутентифицированных)
+        /// </summary>
+        [HttpGet("by-country/{country}")]
+        public IActionResult GetUsersByCountry(string country)
+        {
+
+            return null;
+        }
+
+        /// <summary>
+        /// Получить всех администраторов (только для админов)
         /// </summary>
         [HttpGet("admins")]
+        [Authorize(Roles = "Admin")] // Только админы могут вызвать этот метод
         public async Task<IActionResult> GetAllAdmins()
         {
             var users = await _userManager.GetUsersInRoleAsync("Admin");
@@ -48,13 +84,14 @@ namespace HUMIO_API.Controllers
                 return NotFound("Администраторы не найдены.");
             }
 
-            return Ok(users.Select(user => new
+            var response = users.Select(user => new UserResponse
             {
-                user.Id,
-                user.UserName,
-                user.Email,
-                user.Country
-            }));
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+            });
+
+            return Ok(response);
         }
     }
 }

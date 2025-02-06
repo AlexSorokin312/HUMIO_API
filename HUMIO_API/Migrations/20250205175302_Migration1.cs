@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HUMIO_API.Migrations
 {
     /// <inheritdoc />
-    public partial class Migration5 : Migration
+    public partial class Migration1 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,7 +31,8 @@ namespace HUMIO_API.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
-                    Country = table.Column<string>(type: "text", nullable: false),
+                    GoogleId = table.Column<string>(type: "text", nullable: true),
+                    Name = table.Column<string>(type: "text", nullable: false),
                     UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
@@ -50,6 +51,20 @@ namespace HUMIO_API.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DeviceIdentifiers",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    DeviceId = table.Column<string>(type: "text", nullable: false),
+                    TrialEndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeviceIdentifiers", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -159,19 +174,43 @@ namespace HUMIO_API.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "DeviceIdentifiers",
+                name: "Purchases",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Identifier = table.Column<string>(type: "text", nullable: false),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    Price = table.Column<decimal>(type: "numeric", nullable: false),
+                    PurchaseDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    SubscriptionEndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Purchases", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Purchases_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RefreshTokens",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Token = table.Column<string>(type: "text", nullable: false),
+                    Expires = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsRevoked = table.Column<bool>(type: "boolean", nullable: false),
                     UserId = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_DeviceIdentifiers", x => x.Id);
+                    table.PrimaryKey("PK_RefreshTokens", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_DeviceIdentifiers_AspNetUsers_UserId",
+                        name: "FK_RefreshTokens_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
@@ -179,20 +218,20 @@ namespace HUMIO_API.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Premiums",
+                name: "UserData",
                 columns: table => new
                 {
-                    PremiumId = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     UserId = table.Column<string>(type: "text", nullable: false),
-                    SubscriptionEndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CurrentPurchaseCost = table.Column<decimal>(type: "numeric", nullable: false)
+                    Country = table.Column<string>(type: "text", nullable: false),
+                    Platform = table.Column<string>(type: "text", nullable: false),
+                    PaymentCount = table.Column<int>(type: "integer", nullable: false),
+                    SubscriptionEndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Premiums", x => x.PremiumId);
+                    table.PrimaryKey("PK_UserData", x => x.UserId);
                     table.ForeignKey(
-                        name: "FK_Premiums_AspNetUsers_UserId",
+                        name: "FK_UserData_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
@@ -200,43 +239,27 @@ namespace HUMIO_API.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Trials",
+                name: "UserDevices",
                 columns: table => new
                 {
-                    TrialId = table.Column<int>(type: "integer", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     UserId = table.Column<string>(type: "text", nullable: false),
-                    TrialEndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    DeviceId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Trials", x => x.TrialId);
+                    table.PrimaryKey("PK_UserDevices", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Trials_AspNetUsers_UserId",
+                        name: "FK_UserDevices_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserStats",
-                columns: table => new
-                {
-                    UserStatsId = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    UserId = table.Column<string>(type: "text", nullable: false),
-                    TimeSpentInApp = table.Column<TimeSpan>(type: "interval", nullable: false),
-                    TotalPurchaseAmount = table.Column<decimal>(type: "numeric", nullable: false),
-                    PurchaseCount = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserStats", x => x.UserStatsId);
                     table.ForeignKey(
-                        name: "FK_UserStats_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        name: "FK_UserDevices_DeviceIdentifiers_DeviceId",
+                        column: x => x.DeviceId,
+                        principalTable: "DeviceIdentifiers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -279,27 +302,30 @@ namespace HUMIO_API.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_DeviceIdentifiers_UserId",
+                name: "IX_DeviceIdentifiers_DeviceId",
                 table: "DeviceIdentifiers",
+                column: "DeviceId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Purchases_UserId",
+                table: "Purchases",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Premiums_UserId",
-                table: "Premiums",
-                column: "UserId",
-                unique: true);
+                name: "IX_RefreshTokens_UserId",
+                table: "RefreshTokens",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Trials_UserId",
-                table: "Trials",
-                column: "UserId",
-                unique: true);
+                name: "IX_UserDevices_DeviceId",
+                table: "UserDevices",
+                column: "DeviceId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_UserStats_UserId",
-                table: "UserStats",
-                column: "UserId",
-                unique: true);
+                name: "IX_UserDevices_UserId",
+                table: "UserDevices",
+                column: "UserId");
         }
 
         /// <inheritdoc />
@@ -321,22 +347,25 @@ namespace HUMIO_API.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "DeviceIdentifiers");
+                name: "Purchases");
 
             migrationBuilder.DropTable(
-                name: "Premiums");
+                name: "RefreshTokens");
 
             migrationBuilder.DropTable(
-                name: "Trials");
+                name: "UserData");
 
             migrationBuilder.DropTable(
-                name: "UserStats");
+                name: "UserDevices");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "DeviceIdentifiers");
         }
     }
 }

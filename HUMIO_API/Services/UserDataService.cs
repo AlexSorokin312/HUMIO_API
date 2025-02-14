@@ -1,17 +1,21 @@
-﻿using HUMIO_API.DBContext;
+﻿using AutoMapper;
+using HUMIO_API.DBContext;
 using HUMIO_API.Requests;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 public class UserDataService : IUserDataService
 {
     private readonly AppDbContext _context;
     private readonly UserManager<User> _userManager;
+    private readonly IMapper _mapper;
 
-    public UserDataService(AppDbContext context, UserManager<User> userManager)
+    public UserDataService(AppDbContext context, UserManager<User> userManager, IMapper mapper)
     {
         _context = context;
         _userManager = userManager;
+        _mapper = mapper;
     }
 
     public async Task<UserDto> GetUserByIdAsync(string userId)
@@ -25,17 +29,14 @@ public class UserDataService : IUserDataService
         if (user == null)
             throw new ArgumentException("User not found");
 
+        // Получаем роли пользователя
         var roles = await _userManager.GetRolesAsync(user);
 
-        return new UserDto
-        {
-            Id = user.Id,
-            Email = user.Email,
-            UserName = user.Name,
-            Country = user.UserData?.Country,
-            Roles = roles.ToList()
-            // Если нужно – можно добавить и список устройств в DTO
-        };
+        // Маппим сущность User в UserDto с помощью AutoMapper
+        var userDto = _mapper.Map<UserDto>(user);
+        userDto.Roles = roles.ToList();
+
+        return userDto;
     }
 
     public async Task<UserDto> GetUserByEmailAsync(string email)
@@ -50,20 +51,14 @@ public class UserDataService : IUserDataService
             throw new ArgumentException("User not found");
 
         var roles = await _userManager.GetRolesAsync(user);
+        var userDto = _mapper.Map<UserDto>(user);
+        userDto.Roles = roles.ToList();
 
-        return new UserDto
-        {
-            Id = user.Id,
-            Email = user.Email,
-            UserName = user.Name,
-            Country = user.UserData?.Country,
-            Roles = roles.ToList()
-        };
+        return userDto;
     }
-
+    
     public async Task<List<DeviceIdentifier>> GetUserDevicesAsync(string userId)
     {
-        // Извлекаем устройства через связь в таблице UserDevice
         var devices = await _context.UserDevices
             .Where(ud => ud.UserId == userId)
             .Include(ud => ud.DeviceIdentifier)
@@ -73,31 +68,80 @@ public class UserDataService : IUserDataService
         return devices;
     }
 
-    /// <summary>
-    /// Обновляет дату окончания подписки в UserData и сохраняет информацию о покупке.
-    /// </summary>
-    public async Task RecordPurchaseAndUpdateSubscriptionAsync(PurchaseRequest request)
+    public async Task<CommonResponse> RecordPurchaseAndUpdateSubscriptionAsync(string userId, PurchaseRequest request)
     {
-        // Находим данные пользователя по UserId
-        var userData = await _context.UserData.FirstOrDefaultAsync(ud => ud.UserId == request.UserId);
-        if (userData == null)
-            throw new ArgumentException("User data not found");
-
-        // Обновляем дату окончания подписки
-        userData.SubscriptionEndDate = request.SubscriptionEndDate;
-        _context.UserData.Update(userData);
-
-        // Создаем запись покупки
-        var purchase = new Purchase
+        if (string.IsNullOrEmpty(userId))
+            Log.Warning("User id is empty");
+        using (var transaction = await _context.Database.BeginTransactionAsync())
         {
-            UserId = request.UserId,
-            Price = request.Price,
-            PurchaseDate = request.PurchaseDate,
-            SubscriptionEndDate = request.SubscriptionEndDate
-        };
-        _context.Purchases.Add(purchase);
+            try
+            {
+                Log.Information("Starting transaction for user {UserId}", userId);
 
-        // Сохраняем все изменения
-        await _context.SaveChangesAsync();
+                var userData = await _context.UserData.FirstOrDefaultAsync(ud => ud.UserId == userId);
+                if (userData == null)
+                {
+                    Log.Warning("User data not found for user {UserId}", userId);
+                    return new CommonResponse { Success = false, Message = "User data not found" };
+                }
+
+                // Обновляем дату окончания подписки
+                userData.SubscriptionEndDate = request.SubscriptionEndDate;
+                _context.UserData.Update(userData);
+
+                // Создаем запись покупки
+                var purchase = new Purchase
+                {
+                    UserId = userId,
+                    Price = request.Price,
+                    PurchaseDate = request.PurchaseDate,
+                    SubscriptionEndDate = request.SubscriptionEndDate
+                };
+                _context.Purchases.Add(purchase);
+
+                // Сохраняем изменения в базе данных
+                await _context.SaveChangesAsync();
+
+                // Фиксируем транзакцию
+                await transaction.CommitAsync();
+
+                Log.Information("Transaction committed successfully for user {UserId}", userId);
+
+                return new CommonResponse
+                {
+                    Success = true,
+                    Message = "Purchase recorded and subscription updated successfully"
+                };
+            }
+            catch (Exception ex)
+            {
+                // Откатываем транзакцию в случае ошибки
+                await transaction.RollbackAsync();
+                Log.Error(ex, "Error in transaction for user {UserId}", userId);
+                return new CommonResponse
+                {
+                    Success = false,
+                    Message = $"Error: {ex.Message}"
+                };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, существует ли пользователь с указанным email.
+    /// Возвращает true, если пользователь найден, иначе false.
+    /// </summary>
+    public async Task<bool> UserExistsAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            Log.Warning("UserExistsAsync: Передан пустой или пробельный email.");
+            return false;
+        }
+
+        var user = await _userManager.FindByEmailAsync(email);
+        bool exists = user != null;
+        Log.Information("UserExistsAsync: Пользователь с email {Email} {Exists}.", email, exists ? "найден" : "не найден");
+        return exists;
     }
 }

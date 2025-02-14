@@ -20,5 +20,7 @@ public interface IUserDataService
     /// <summary>
     /// Обновляет дату окончания подписки для пользователя.
     /// </summary>
-    Task RecordPurchaseAndUpdateSubscriptionAsync(PurchaseRequest request);
+    Task<CommonResponse> RecordPurchaseAndUpdateSubscriptionAsync(string id, PurchaseRequest request);
+
+    Task<bool> UserExistsAsync(string email);
 }

@@ -1,8 +1,10 @@
 ﻿using System.Security.Claims;
 using Humio.Requests;
+using HUMIO_API.Model.Request;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -21,11 +23,19 @@ public class AuthController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var result = await _authService.RegisterAsync(model);
-        if (!result.Succeeded)
-            return BadRequest(result.Errors);
+        bool isRegistered = await _authService.RegisterAsync(model);
+        if (!isRegistered)
+            return BadRequest(new CommonResponse
+            {
+                Success = false,
+                Message = "Registration failed."
+            });
 
-        return Ok(new { message = "User registered successfully." });
+        return Ok(new CommonResponse
+        {
+            Success = true,
+            Message = "User registered successfully."
+        });
     }
 
 
@@ -44,10 +54,25 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
     {
-        await _authService.LogoutAsync();
-        return Ok(new { message = "User logged out" });
+        if (string.IsNullOrEmpty(request.RefreshToken))
+        {
+            return BadRequest(new CommonResponse
+            {
+                Success = false,
+                Message = "Refresh token is required."
+            });
+        }
+
+        var result = await _authService.LogoutAsync(request.RefreshToken);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
     }
 
     [HttpPost("google")]
@@ -55,18 +80,20 @@ public class AuthController : ControllerBase
     {
         try
         {
+            Log.Information("Начало Google аутентификации для AccessToken: {AccessToken}", request.AccessToken);
             var token = await _authService.GoogleAuthAsync(request);
             return Ok(new { accessToken = token.AccessToken, refreshToken = token.RefreshToken });
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            Log.Error(ex, "Ошибка при Google аутентификации");
+            return BadRequest(new { error = ex.Message });
         }
     }
 
     [Authorize]
     [HttpGet("user")]
-    public async Task<IActionResult> GetUser()
+    public async Task<IActionResult> GetCurrentUserByToken()
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userId))

@@ -1,6 +1,6 @@
 ﻿namespace Humio.Requests
 {
-    public class GoogleUserResponce
+    public class GoogleUserResponse
     {
         public string Id { get; set; }
         public string Email { get; set; }

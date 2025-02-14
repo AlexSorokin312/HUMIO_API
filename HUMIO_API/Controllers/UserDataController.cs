@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
 using HUMIO_API.Requests;
-using System;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -66,14 +66,9 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Модель запроса для обновления даты окончания подписки.
+    /// Записывает покупку и одновременно обновляет дату окончания подписки.
+    /// Принимает PurchaseRequest, который включает цену покупки, дату покупки и новую дату окончания подписки.
     /// </summary>
-    public class UpdateSubscriptionRequest
-    {
-        public string UserId { get; set; }
-        public DateTime SubscriptionEndDate { get; set; }
-    }
-
     /// <summary>
     /// Записывает покупку и одновременно обновляет дату окончания подписки.
     /// Принимает PurchaseRequest, который включает цену покупки, дату покупки и новую дату окончания подписки.
@@ -83,12 +78,77 @@ public class UserDataController : ControllerBase
     {
         try
         {
-            await _userDataService.RecordPurchaseAndUpdateSubscriptionAsync(request);
-            return Ok(new { message = "Purchase recorded and subscription updated successfully" });
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                Log.Warning("Unauthorized access attempt in RecordPurchase");
+                return Unauthorized(new CommonResponse
+                {
+                    Success = false,
+                    Message = "Пользователь не авторизован."
+                });
+            }
+
+            Log.Information("Recording purchase for user {UserId}", userId);
+
+            var response = await _userDataService.RecordPurchaseAndUpdateSubscriptionAsync(userId, request);
+            if (response.Success)
+            {
+                Log.Information("Purchase recorded successfully for user {UserId}", userId);
+                return Ok(response);
+            }
+            else
+            {
+                Log.Warning("Failed to record purchase for user {UserId}: {Message}", userId, response.Message);
+                return BadRequest(response);
+            }
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            Log.Error(ex, "Error in RecordPurchase for user {UserId}", User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            return BadRequest(new CommonResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
         }
     }
+
+    /// <summary>
+    /// Проверяет, существует ли пользователь с указанным email.
+    /// Возвращает объект CommonResponse с полями Success и Message.
+    /// </summary>
+    [HttpGet("exists/{email}")]
+    public async Task<IActionResult> UserExists(string email)
+    {
+        try
+        {
+            bool exists = await _userDataService.UserExistsAsync(email);
+            var response = new CommonResponse
+            {
+                Success = exists,
+                Message = exists ? "Пользователь найден" : "Пользователь не найден"
+            };
+            Log.Information("UserExists: Пользователь с email {Email} {Status}.", email, exists ? "найден" : "не найден");
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Ошибка при проверке существования пользователя с email {Email}.", email);
+            return BadRequest(new CommonResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+    }
+}
+
+/// <summary>
+/// Модель запроса для обновления даты окончания подписки.
+/// </summary>
+public class UpdateSubscriptionRequest
+{
+    public string UserId { get; set; }
+    public DateTime SubscriptionEndDate { get; set; }
 }

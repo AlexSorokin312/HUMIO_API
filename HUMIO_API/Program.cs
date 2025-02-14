@@ -7,12 +7,22 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Настройка Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .CreateLogger();
+
+builder.Logging.ClearProviders(); // Отключаем стандартные провайдеры логирования
+builder.Host.UseSerilog(); // Используем Serilog
 
 // Добавляем контекст базы данных
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -58,9 +68,13 @@ builder.Services.AddAuthentication(options =>
     googleOptions.CallbackPath = "/api/Auth/google-response";
 });
 
+builder.Services.AddAutoMapper(typeof(MappingProfile));
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IUserDataService, UserDataService>();
+builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+
 
 builder.Services.AddAuthorization();
 

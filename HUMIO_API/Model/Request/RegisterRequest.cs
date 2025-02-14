@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+
 namespace Humio.Requests
 {
     public class RegisterRequest

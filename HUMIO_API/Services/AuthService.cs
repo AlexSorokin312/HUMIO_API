@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using AutoMapper;
 using Humio.Requests;
 using HUMIO_API.DBContext;
 using HUMIO_API.Requests;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
+using Serilog;
 
 public class AuthService : IAuthService
 {
@@ -15,17 +17,20 @@ public class AuthService : IAuthService
     private readonly SignInManager<User> _signInManager;
     private readonly IConfiguration _configuration;
     private readonly AppDbContext _context;
+    private readonly IMapper _mapper;
 
     public AuthService(
         UserManager<User> userManager,
         SignInManager<User> signInManager,
         IConfiguration configuration,
-        AppDbContext context)
+        AppDbContext context,
+        IMapper mapper)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _configuration = configuration;
         _context = context;
+        _mapper = mapper;
     }
 
     #region Public Methods
@@ -49,158 +54,233 @@ public class AuthService : IAuthService
         return await GenerateJwtTokens(user);
     }
 
-    public async Task<IdentityResult> RegisterAsync(RegisterRequest model)
+    public async Task<bool> RegisterAsync(RegisterRequest model)
     {
-        // Проверяем, существует ли уже пользователь с таким email
-        var existingUser = await _userManager.FindByEmailAsync(model.Email);
-        if (existingUser != null)
+        try
         {
-            // Если пользователь существует, проверяем, установлен ли у него пароль
-            if (string.IsNullOrEmpty(existingUser.PasswordHash))
+            // Проверяем, существует ли уже пользователь с таким email
+            var existingUser = await _userManager.FindByEmailAsync(model.Email);
+            if (existingUser != null)
             {
-                // Пользователь существует, но не имеет пароля — добавляем его
-                var addPasswordResult = await _userManager.AddPasswordAsync(existingUser, model.Password);
-                if (!addPasswordResult.Succeeded)
+                // Если пользователь уже зарегистрирован, но без пароля
+                if (string.IsNullOrEmpty(existingUser.PasswordHash))
                 {
-                    return IdentityResult.Failed(new IdentityError { Description = "Unable to set the password." });
-                }
-
-                // Дополнительно можно обновить данные, если они отличаются от новых данных регистрации.
-                existingUser.UserName = model.UserName.Replace(" ", string.Empty);
-                existingUser.Name = model.UserName;
-                // Можно обновить и связанные данные пользователя (UserData), если требуется:
-                if (existingUser.UserData == null)
-                {
-                    existingUser.UserData = new UserData
+                    try
                     {
-                        Country = model.Country,
-                        Platform = model.Platform,
-                        PaymentCount = 0,
-                        SubscriptionEndDate = null
-                    };
+                        // Устанавливаем пароль
+                        var addPasswordResult = await _userManager.AddPasswordAsync(existingUser, model.Password);
+                        if (!addPasswordResult.Succeeded)
+                        {
+                            throw new Exception($"Ошибка при добавлении пароля: {string.Join(", ", addPasswordResult.Errors.Select(e => e.Description))}");
+                        }
+
+                        // Обновляем UserName и Name
+                        existingUser.UserName = "Default";
+                        existingUser.Name = model.UserName;
+
+                        // Загружаем UserData (если его нет - создаем)
+                        var userData = await _context.UserData.FirstOrDefaultAsync(ud => ud.UserId == existingUser.Id);
+                        if (userData == null)
+                        {
+                            userData = new UserData
+                            {
+                                UserId = existingUser.Id, // Обязательно устанавливаем UserId!
+                                Country = model.Country,
+                                Platform = model.Platform,
+                                PaymentCount = 0,
+                                UserName = model.UserName,
+                                SubscriptionEndDate = null
+                            };
+                            _context.UserData.Add(userData);
+                        }
+                        else
+                        {
+                            userData.Country = model.Country;
+                            userData.Platform = model.Platform;
+                            _context.UserData.Update(userData);
+                        }
+
+                        await _context.SaveChangesAsync();
+
+                        await BindUserToExistingDeviceAsync(existingUser, model.DeviceIdentifier);
+
+                        // Автоматический вход
+                        await _signInManager.SignInAsync(existingUser, isPersistent: false);
+
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Ошибка при обновлении существующего пользователя: {ex.Message}");
+                        return false;
+                    }
                 }
                 else
                 {
-                    existingUser.UserData.Country = model.Country;
-                    existingUser.UserData.Platform = model.Platform;
+                    Console.WriteLine("Пользователь с таким email уже существует.");
+                    return false;
                 }
-
-                var updateResult = await _userManager.UpdateAsync(existingUser);
-                if (!updateResult.Succeeded)
-                {
-                    return IdentityResult.Failed(new IdentityError { Description = "Failed to update user data." });
-                }
-
-                // Привязка устройства (если нужно обновить привязку)
-                await BindUserToExistingDeviceAsync(existingUser, model.DeviceIdentifier);
-
-                return IdentityResult.Success;
             }
-            else
+
+            // Создаем нового пользователя
+            var user = new User
             {
-                // Если пароль уже установлен — сообщаем, что пользователь существует.
-                return IdentityResult.Failed(new IdentityError { Description = "User with that email already exists." });
-            }
-        }
-
-        // Если пользователя нет — создаём нового со всеми данными и паролем.
-        var user = new User
-        {
-            UserName = model.UserName.Replace(" ", string.Empty),
-            Email = model.Email,
-            Name = model.UserName,
-            UserData = new UserData
-            {
-                Country = model.Country,
-                Platform = model.Platform,
-                PaymentCount = 0,
-                SubscriptionEndDate = null // будет обновлено, если устройство имеет TrialEndDate
-            }
-        };
-
-        var result = await CreateAndSetupUserAsync(user, model.Password, model.Role);
-        if (!result.Succeeded)
-            return result;
-
-        await BindUserToExistingDeviceAsync(user, model.DeviceIdentifier);
-
-        return result;
-    }
-
-    public async Task<TokenResponse> GoogleAuthAsync(GoogleTokenRequest request)
-    {
-        var googleUser = await GetGoogleUserInfo(request.AccessToken);
-        if (googleUser == null || string.IsNullOrEmpty(googleUser.Email))
-            throw new ArgumentException("Не удалось получить данные пользователя.");
-
-        var user = await _userManager.FindByEmailAsync(googleUser.Email);
-        if (user == null)
-        {
-            user = new User
-            {
-                UserName = googleUser.Name.Replace(" ", string.Empty),
-                Name = googleUser.Name,
-                Email = googleUser.Email,
-                GoogleId = googleUser.Id,
+                UserName = "Default", // Избегаем русских символов
+                Email = model.Email,
+                Name = model.UserName,
                 UserData = new UserData
                 {
-                    Country = request.Country,
-                    Platform = request.Platform,
+                    UserId = "", // Пока пусто, заполним после создания
+                    Country = model.Country,
+                    Platform = model.Platform,
                     PaymentCount = 0,
+                    UserName = model.UserName,
+                    TrialEndDate = DateTime.UtcNow,
                     SubscriptionEndDate = null
                 }
             };
 
-            var createResult = await _userManager.CreateAsync(user);
-            if (!createResult.Succeeded)
-                throw new InvalidOperationException(string.Join(", ", createResult.Errors.Select(e => e.Description)));
+            // Создаем пользователя
+            var result = await CreateAndSetupUserAsync(user, model.Password, model.Role);
+            if (!result.Succeeded)
+            {
+                throw new Exception($"Ошибка при создании пользователя: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            }
+
+            // Присваиваем ID в UserData и обновляем
+            user.UserData.UserId = user.Id;
+            _context.UserData.Update(user.UserData);
+            await _context.SaveChangesAsync();
+
+            await BindUserToExistingDeviceAsync(user, model.DeviceIdentifier);
+
+            // Автоматический вход
+            await _signInManager.SignInAsync(user, isPersistent: false);
+
+            return true;
         }
-
-        await EnsureUserDeviceBindingAsync(user.Id, request.DeviceIdentifier);
-
-        return await GenerateJwtTokens(user);
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка в методе RegisterAsync: {ex.Message}");
+            return false;
+        }
     }
 
-    public async Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
+    public async Task<TokenResponse> GoogleAuthAsync(GoogleTokenRequest request)
     {
-        var principal = GetPrincipalFromExpiredToken(request.AccessToken);
-        if (principal == null)
-            throw new SecurityTokenException("Invalid access token.");
+        try
+        {
+            Log.Information("Запрос данных пользователя из Google для AccessToken: {AccessToken}", request.AccessToken);
+            var googleUser = await GetGoogleUserInfo(request.AccessToken);
 
-        var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
-            throw new SecurityTokenException("Invalid access token.");
+            if (googleUser == null || string.IsNullOrEmpty(googleUser.Email))
+            {
+                Log.Warning("Не удалось получить данные пользователя от Google.");
+                throw new ArgumentException("Не удалось получить данные пользователя от Google.");
+            }
 
-        var storedRefreshToken = await _context.RefreshTokens
-            .FirstOrDefaultAsync(x => x.Token == request.RefreshToken && x.UserId == userId);
+            Log.Information("Google пользователь найден: {Email}, {GoogleId}", googleUser.Email, googleUser.Id);
+            var user = await _userManager.FindByEmailAsync(googleUser.Email);
 
-        if (storedRefreshToken == null || storedRefreshToken.Expires < DateTime.UtcNow || storedRefreshToken.IsRevoked)
-            throw new SecurityTokenException("Invalid refresh token.");
+            if (user == null)
+            {
+                Log.Information("Создание нового пользователя {Email}", googleUser.Email);
+                user = new User
+                {
+                    UserName = googleUser.Name.Replace(" ", string.Empty),
+                    Name = googleUser.Name,
+                    Email = googleUser.Email,
+                    GoogleId = googleUser.Id,
+                    UserData = new UserData
+                    {
+                        UserName = googleUser.Name,
+                        Country = request.Country,
+                        Platform = request.Platform,
+                        PaymentCount = 0,
+                        SubscriptionEndDate = null,
+                    }
+                };
 
-        storedRefreshToken.IsRevoked = true;
-        await _context.SaveChangesAsync();
+                var createResult = await _userManager.CreateAsync(user);
+                if (!createResult.Succeeded)
+                {
+                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                    Log.Error("Ошибка при создании пользователя: {Errors}", errors);
+                    throw new InvalidOperationException("Ошибка при создании пользователя: " + errors);
+                }
+                Log.Information("Пользователь {Email} успешно создан", googleUser.Email);
+            }
+            else
+            {
+                Log.Information("Пользователь {Email} уже существует", googleUser.Email);
+            }
 
-        await CleanupExpiredRefreshTokensAsync(userId);
+            await BindUserToExistingDeviceAsync(user, request.DeviceIdentifier);
+            Log.Information("Пользователь {Email} привязан к устройству {DeviceId}", googleUser.Email, request.DeviceIdentifier);
 
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user == null)
-            throw new SecurityTokenException("User not found.");
-
-        return await GenerateJwtTokens(user);
+            var tokens = await GenerateJwtTokens(user);
+            Log.Information("JWT токены успешно сгенерированы для {Email}", googleUser.Email);
+            return tokens;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Ошибка при Google аутентификации");
+            throw new Exception("Ошибка при Google аутентификации: " + ex.Message, ex);
+        }
     }
+
 
     public async Task<UserDto> GetUserAsync(string userId)
     {
-        var user = await _userManager.FindByIdAsync(userId);
+        // Жадно загружаем связанные сущности
+        var user = await _context.Users
+            .Include(u => u.UserData)
+            .Include(u => u.UserDevices)
+                .ThenInclude(ud => ud.DeviceIdentifier)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
         if (user == null)
             throw new ArgumentException("User not found.");
 
-        return await MapUserToDto(user);
+        // Маппим объект User в UserDto с помощью AutoMapper
+        var userDto = _mapper.Map<UserDto>(user);
+
+        // Получаем роли отдельно, так как они не включены в маппинг профиля
+        var roles = await _userManager.GetRolesAsync(user);
+        userDto.Roles = roles.ToList();
+
+        return userDto;
     }
 
-    public async Task LogoutAsync()
+    public async Task<CommonResponse> LogoutAsync(string refreshToken)
     {
-        await _signInManager.SignOutAsync();
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return new CommonResponse
+            {
+                Success = false,
+                Message = "Refresh token is required."
+            };
+        }
+
+        var storedToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == refreshToken);
+        if (storedToken == null)
+        {
+            return new CommonResponse
+            {
+                Success = false,
+                Message = "Refresh token not found."
+            };
+        }
+
+        storedToken.IsRevoked = true;
+        await _context.SaveChangesAsync();
+
+        return new CommonResponse
+        {
+            Success = true,
+            Message = "User logged out successfully."
+        };
     }
 
     #endregion
@@ -212,23 +292,36 @@ public class AuthService : IAuthService
     /// </summary>
     private async Task<IdentityResult> CreateAndSetupUserAsync(User user, string password, string role)
     {
-        var result = await _userManager.CreateAsync(user, password);
-        if (!result.Succeeded)
-            return result;
+        try
+        {
+            user.UserName = "EmptyName";
+            var result = await _userManager.CreateAsync(user, password);
+            if (!result.Succeeded)
+                return result;
 
-        role = string.IsNullOrEmpty(role) ? "User" : role;
-        var roleResult = await _userManager.AddToRoleAsync(user, role);
-        if (!roleResult.Succeeded)
-            return roleResult;
+            role = string.IsNullOrEmpty(role) ? "User" : role;
+            var roleResult = await _userManager.AddToRoleAsync(user, role);
+            if (!roleResult.Succeeded)
+                return roleResult;
 
-        var claims = new List<Claim>
+            var claims = new List<Claim>
         {
             new Claim(ClaimTypes.Role, role),
             new Claim("Country", user.UserData?.Country ?? ""),
             new Claim("CreatedAt", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))
         };
-        await _userManager.AddClaimsAsync(user, claims);
-        return result;
+
+            await _userManager.AddClaimsAsync(user, claims);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            return IdentityResult.Failed(new IdentityError
+            {
+                Code = "Exception",
+                Description = ex.Message
+            });
+        }
     }
 
     /// <summary>
@@ -239,6 +332,10 @@ public class AuthService : IAuthService
     /// </summary>
     private async Task BindUserToExistingDeviceAsync(User user, string deviceIdentifier)
     {
+        if (user == null)
+            return;
+
+        // Находим устройство по заданному DeviceIdentifier
         var device = await _context.DeviceIdentifiers
             .Include(d => d.UserDevices)
             .FirstOrDefaultAsync(d => d.DeviceId == deviceIdentifier);
@@ -257,10 +354,24 @@ public class AuthService : IAuthService
             await _context.SaveChangesAsync();
         }
 
-        // Копируем trial дату из устройства в UserData, если она установлена
+        // Гарантируем, что у пользователя загружен объект UserData
+        if (user.UserData == null)
+        {
+            // Пытаемся загрузить UserData из базы
+            user.UserData = await _context.UserData.FirstOrDefaultAsync(ud => ud.UserId == user.Id);
+            // Если и в базе записи нет, инициализируем новый объект (при необходимости можно добавить сохранение в базу)
+            if (user.UserData == null)
+            {
+                user.UserData = new UserData { UserId = user.Id };
+                _context.UserData.Add(user.UserData);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        // Если у устройства задан TrialEndDate, копируем его в UserData.TrialEndDate
         if (device.TrialEndDate.HasValue)
         {
-            user.UserData.SubscriptionEndDate = device.TrialEndDate;
+            user.UserData.TrialEndDate = device.TrialEndDate;
             await _userManager.UpdateAsync(user);
         }
     }
@@ -324,12 +435,40 @@ public class AuthService : IAuthService
         };
     }
 
+    public async Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
+    {
+        var principal = GetPrincipalFromExpiredToken(request.AccessToken);
+        if (principal == null)
+            throw new SecurityTokenException("Invalid access token.");
+
+        var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            throw new SecurityTokenException("Invalid access token.");
+
+        var storedRefreshToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(x => x.Token == request.RefreshToken && x.UserId == userId);
+
+        if (storedRefreshToken == null || storedRefreshToken.Expires < DateTime.UtcNow || storedRefreshToken.IsRevoked)
+            throw new SecurityTokenException("Invalid refresh token.");
+
+        storedRefreshToken.IsRevoked = true;
+        await _context.SaveChangesAsync();
+
+        await CleanupExpiredRefreshTokensAsync(userId);
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+            throw new SecurityTokenException("User not found.");
+
+        return await GenerateJwtTokens(user);
+    }
+
     private async Task SaveRefreshTokenAsync(User user, string refreshToken)
     {
         var tokenEntry = new RefreshToken
         {
             Token = refreshToken,
-            Expires = DateTime.UtcNow.AddDays(7),
+            Expires = DateTime.UtcNow.AddDays(30),
             IsRevoked = false,
             UserId = user.Id
         };
@@ -385,20 +524,7 @@ public class AuthService : IAuthService
         return principal;
     }
 
-    private async Task<UserDto> MapUserToDto(User user)
-    {
-        var roles = await _userManager.GetRolesAsync(user);
-        return new UserDto
-        {
-            Id = user.Id,
-            Email = user.Email,
-            UserName = user.Name,
-            Country = user.UserData?.Country,
-            Roles = roles.ToList()
-        };
-    }
-
-    private async Task<GoogleUserResponce> GetGoogleUserInfo(string accessToken)
+    private async Task<GoogleUserResponse> GetGoogleUserInfo(string accessToken)
     {
         var googleUserInfoUrl = "https://www.googleapis.com/oauth2/v2/userinfo";
         using (var httpClient = new HttpClient())
@@ -412,7 +538,7 @@ public class AuthService : IAuthService
                 throw new UnauthorizedAccessException("Invalid access token.");
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<GoogleUserResponce>(jsonResponse);
+            return JsonConvert.DeserializeObject<GoogleUserResponse>(jsonResponse);
         }
     }
 

@@ -67,7 +67,6 @@ namespace HUMIO_API.Controllers
         [HttpGet("by-country/{country}")]
         public IActionResult GetUsersByCountry(string country)
         {
-
             return null;
         }
 

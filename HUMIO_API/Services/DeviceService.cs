@@ -1,4 +1,5 @@
-﻿using HUMIO_API.DBContext;
+﻿using AutoMapper;
+using HUMIO_API.DBContext;
 using HUMIO_API.Requests;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,7 @@ namespace HUMIO_API.Services
         /// </summary>
         /// <param name="request">Данные устройства.</param>
         /// <returns>Объект DeviceIdentifier.</returns>
-        Task<DeviceIdentifier> GetOrCreateDeviceAsync(DeviceRequest request);
+        Task<DeviceIdentifierResponce> GetOrCreateDeviceAsync(DeviceRequest request);
 
         /// <summary>
         /// Удаляет запись DeviceIdentifier, если она не связана с зарегистрированными пользователями.
@@ -23,39 +24,50 @@ namespace HUMIO_API.Services
 
         public class DeviceService : IDeviceService
         {
-            private readonly AppDbContext _context;
+        private const int trial_days = 3;
+        private readonly AppDbContext _context;
+        private readonly IMapper _mapper;
 
-            public DeviceService(AppDbContext context)
+        public DeviceService(AppDbContext context, IMapper mapper)
+        {
+            _context = context;
+            _mapper = mapper;
+        }
+
+        public async Task<DeviceIdentifierResponce> GetOrCreateDeviceAsync(DeviceRequest request)
+        {
+            // Проверяем, существует ли уже запись с таким DeviceId.
+            var existingDevice = await _context.DeviceIdentifiers
+                .FirstOrDefaultAsync(d => d.DeviceId == request.DeviceIdentifier);
+
+            if (existingDevice != null)
             {
-                _context = context;
+                // Маппим существующую запись в модель ответа
+                var response = _mapper.Map<DeviceIdentifierResponce>(existingDevice);
+                response.IsFirstLaunch = false;
+                return response;
             }
 
-            public async Task<DeviceIdentifier> GetOrCreateDeviceAsync(DeviceRequest request)
+            // Если записи нет, создаём новую.
+            var newDevice = new DeviceIdentifier
             {
-                // Проверяем, существует ли уже запись с таким DeviceId.
-                var existingDevice = await _context.DeviceIdentifiers
-                    .FirstOrDefaultAsync(d => d.DeviceId == request.DeviceIdentifier);
+                DeviceId = request.DeviceIdentifier,
+                TrialEndDate = DateTime.UtcNow.AddDays(trial_days),
+                Country = request.Country,
+                Platform = request.Platform
+            };
 
-                if (existingDevice != null)
-                {
-                    // Если запись уже есть, просто возвращаем её.
-                    return existingDevice;
-                }
+            _context.DeviceIdentifiers.Add(newDevice);
+            await _context.SaveChangesAsync();
 
-                // Если записи нет, создаём новую.
-                var newDevice = new DeviceIdentifier
-                {
-                    DeviceId = request.DeviceIdentifier,
-                    TrialEndDate = DateTime.UtcNow.AddDays(3)
-                };
+            // Маппим созданное устройство в модель ответа
+            var newResponse = _mapper.Map<DeviceIdentifierResponce>(newDevice);
+            newResponse.IsFirstLaunch = true;
+            return newResponse;
+        }
 
-                _context.DeviceIdentifiers.Add(newDevice);
-                await _context.SaveChangesAsync();
 
-                return newDevice;
-            }
-
-            public async Task<bool> DeleteAnonymousDeviceAsync(string deviceId)
+        public async Task<bool> DeleteAnonymousDeviceAsync(string deviceId)
             {
                 // Находим запись по DeviceId
                 var device = await _context.DeviceIdentifiers

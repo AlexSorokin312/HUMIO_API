@@ -13,12 +13,15 @@ namespace HUMIO_API.DBContext
         public DbSet<DeviceIdentifier> DeviceIdentifiers { get; set; }
         public DbSet<UserDevice> UserDevices { get; set; }
         public DbSet<Purchase> Purchases { get; set; }
+        public DbSet<TemporaryPromoCode> TemporaryPromoCodes { get; set; }
+        public DbSet<PermanentPromoCode> PermanentPromoCodes { get; set; }
+        public DbSet<PermanentPromoCodeUsage> PermanentPromoCodeUsages { get; set; }
+        public DbSet<PasswordReset> PasswordResets { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // User -> UserData (1 к 1)
             modelBuilder.Entity<User>()
                 .HasOne(u => u.UserData)
                 .WithOne(ud => ud.User)
@@ -49,6 +52,32 @@ namespace HUMIO_API.DBContext
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PermanentPromoCodeUsage>()
+                .HasOne(ppcu => ppcu.User)
+                .WithMany()  
+                .HasForeignKey(ppcu => ppcu.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PermanentPromoCodeUsage>()
+                .HasOne(ppcu => ppcu.PermanentPromoCode)
+                .WithMany(ppc => ppc.PermanentPromoCodeUsages)
+                .HasForeignKey(ppcu => ppcu.PermanentPromoCodeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PermanentPromoCodeUsage>()
+                .HasIndex(ppcu => new { ppcu.UserId, ppcu.PermanentPromoCodeId })
+                .IsUnique();
+
+            modelBuilder.Entity<PasswordReset>()
+                .HasOne(pr => pr.User)
+                .WithMany() 
+                .HasForeignKey(pr => pr.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PasswordReset>()
+                .HasIndex(pr => pr.ResetCode)
+                .IsUnique();
         }
     }
 }

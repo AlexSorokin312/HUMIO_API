@@ -3,6 +3,7 @@ using System;
 using HUMIO_API.DBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HUMIO_API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250206140303_Migration3")]
+    partial class Migration3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -30,15 +33,7 @@ namespace HUMIO_API.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Country")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("DeviceId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Platform")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -51,86 +46,6 @@ namespace HUMIO_API.Migrations
                         .IsUnique();
 
                     b.ToTable("DeviceIdentifiers");
-                });
-
-            modelBuilder.Entity("HUMIO_API.Requests.PasswordReset", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResetCode")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ResetCode")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("PasswordResets");
-                });
-
-            modelBuilder.Entity("HUMIO_API.Requests.PermanentPromoCode", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ExtensionDays")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PermanentPromoCodes");
-                });
-
-            modelBuilder.Entity("HUMIO_API.Requests.PermanentPromoCodeUsage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("PermanentPromoCodeId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UsedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PermanentPromoCodeId");
-
-                    b.HasIndex("UserId", "PermanentPromoCodeId")
-                        .IsUnique();
-
-                    b.ToTable("PermanentPromoCodeUsages");
                 });
 
             modelBuilder.Entity("HUMIO_API.Requests.Purchase", b =>
@@ -159,26 +74,6 @@ namespace HUMIO_API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Purchases");
-                });
-
-            modelBuilder.Entity("HUMIO_API.Requests.TemporaryPromoCode", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ExtensionDays")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TemporaryPromoCodes");
                 });
 
             modelBuilder.Entity("HUMIO_API.Requests.User", b =>
@@ -269,9 +164,6 @@ namespace HUMIO_API.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("SubscriptionEndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("TrialEndDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UserName")
@@ -468,36 +360,6 @@ namespace HUMIO_API.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("HUMIO_API.Requests.PasswordReset", b =>
-                {
-                    b.HasOne("HUMIO_API.Requests.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("HUMIO_API.Requests.PermanentPromoCodeUsage", b =>
-                {
-                    b.HasOne("HUMIO_API.Requests.PermanentPromoCode", "PermanentPromoCode")
-                        .WithMany("PermanentPromoCodeUsages")
-                        .HasForeignKey("PermanentPromoCodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("HUMIO_API.Requests.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("PermanentPromoCode");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("HUMIO_API.Requests.Purchase", b =>
                 {
                     b.HasOne("HUMIO_API.Requests.User", "User")
@@ -604,11 +466,6 @@ namespace HUMIO_API.Migrations
             modelBuilder.Entity("HUMIO_API.Requests.DeviceIdentifier", b =>
                 {
                     b.Navigation("UserDevices");
-                });
-
-            modelBuilder.Entity("HUMIO_API.Requests.PermanentPromoCode", b =>
-                {
-                    b.Navigation("PermanentPromoCodeUsages");
                 });
 
             modelBuilder.Entity("HUMIO_API.Requests.User", b =>

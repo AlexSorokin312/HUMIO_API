@@ -6,9 +6,9 @@ namespace HUMIO_API.Requests
 {
     public class User : IdentityUser
     {
-        public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
         public string? GoogleId { get; set; }
         public string Name { get; set; } 
+        public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
         public UserData UserData { get; set; }
     }
 
@@ -20,10 +20,13 @@ namespace HUMIO_API.Requests
         public string Country { get; set; }
         public string Platform { get; set; }
         public int PaymentCount { get; set; }
+        public string UserName { get; set; }
+        public DateTime? TrialEndDate { get; set; }
         public DateTime? SubscriptionEndDate { get; set; }
-
         public User User { get; set; }
     }
+
+
 
     public class DeviceIdentifier
     {
@@ -34,7 +37,23 @@ namespace HUMIO_API.Requests
         public string DeviceId { get; set; }
 
         public DateTime? TrialEndDate { get; set; }
+        public string Country { get; set; }
+        public string Platform { get; set; }
+        public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
+    }
 
+    public class DeviceIdentifierResponce
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        public string DeviceId { get; set; }
+
+        public DateTime? TrialEndDate { get; set; }
+        public string Country { get; set; }
+        public string Platform { get; set; }
+        public bool IsFirstLaunch { get; set; }
         public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
     }
 
@@ -44,7 +63,7 @@ namespace HUMIO_API.Requests
         public int Id { get; set; }
 
         [Required, ForeignKey("User")]
-        public string UserId { get; set; } // Должно быть string
+        public string UserId { get; set; }
 
         [Required, ForeignKey("DeviceIdentifier")]
         public int DeviceId { get; set; }
@@ -63,10 +82,59 @@ namespace HUMIO_API.Requests
         public User User { get; set; }
         [Required]
         public decimal Price { get; set; }
-
         [Required]
         public DateTime PurchaseDate { get; set; }
         [Required]
         public DateTime SubscriptionEndDate { get; set; }
+    }
+
+    public class TemporaryPromoCode
+    {
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        public string Code { get; set; }
+        public int ExtensionDays { get; set; }
+    }
+
+    public class PermanentPromoCode
+    {
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        public string Code { get; set; }
+        public int ExtensionDays { get; set; }
+        public ICollection<PermanentPromoCodeUsage> PermanentPromoCodeUsages { get; set; } = new List<PermanentPromoCodeUsage>();
+    }
+
+    public class PermanentPromoCodeUsage
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        public string UserId { get; set; }
+        public User User { get; set; }
+
+        [Required]
+        public int PermanentPromoCodeId { get; set; }
+        public PermanentPromoCode PermanentPromoCode { get; set; }
+
+        public DateTime UsedOn { get; set; } = DateTime.UtcNow;
+    }
+
+    public class PasswordReset
+    {
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        public string ResetCode { get; set; }
+        [Required, ForeignKey("User")]
+        public string UserId { get; set; }
+        public User User { get; set; }
+        [Required]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        [Required]
+        public DateTime ExpiresAt { get; set; }
     }
 }

@@ -86,7 +86,7 @@ namespace HUMIO_API.Controllers
             var response = users.Select(user => new UserResponse
             {
                 Id = user.Id,
-                UserName = user.UserName,
+                UserName = user.Name,
                 Email = user.Email,
             });
 

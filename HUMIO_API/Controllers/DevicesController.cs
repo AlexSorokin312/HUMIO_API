@@ -1,6 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using HUMIO_API.Requests;
-using HUMIO_API.Services;
+﻿using HUMIO_API.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace HUMIO_API.Controllers
 {

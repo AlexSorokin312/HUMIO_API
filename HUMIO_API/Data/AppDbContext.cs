@@ -22,11 +22,15 @@ namespace HUMIO_API.DBContext
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<User>()
-                .HasOne(u => u.UserData)
-                .WithOne(ud => ud.User)
-                .HasForeignKey<UserData>(ud => ud.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasOne(u => u.UserData)
+                      .WithOne(ud => ud.User)
+                      .HasForeignKey<UserData>(ud => ud.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(u => u.UserName).IsUnique(false);
+            });
 
             modelBuilder.Entity<UserDevice>()
                 .HasKey(ud => ud.Id);
@@ -78,6 +82,8 @@ namespace HUMIO_API.DBContext
             modelBuilder.Entity<PasswordReset>()
                 .HasIndex(pr => pr.ResetCode)
                 .IsUnique();
+
+
         }
     }
 }

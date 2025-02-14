@@ -75,7 +75,6 @@ public class AuthService : IAuthService
                         }
 
                         // Обновляем UserName и Name
-                        existingUser.UserName = "Default";
                         existingUser.Name = model.UserName;
 
                         // Загружаем UserData (если его нет - создаем)
@@ -125,9 +124,10 @@ public class AuthService : IAuthService
             // Создаем нового пользователя
             var user = new User
             {
-                UserName = "Default", // Избегаем русских символов
+                //UserName = "Default", // Избегаем русских символов
                 Email = model.Email,
                 Name = model.UserName,
+                UserName = model.Email,
                 UserData = new UserData
                 {
                     UserId = "", // Пока пусто, заполним после создания
@@ -187,7 +187,7 @@ public class AuthService : IAuthService
                 Log.Information("Создание нового пользователя {Email}", googleUser.Email);
                 user = new User
                 {
-                    UserName = googleUser.Name.Replace(" ", string.Empty),
+                    UserName = googleUser.Email,
                     Name = googleUser.Name,
                     Email = googleUser.Email,
                     GoogleId = googleUser.Id,
@@ -294,7 +294,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            user.UserName = "EmptyName";
+            user.UserName = user.Email;
             var result = await _userManager.CreateAsync(user, password);
             if (!result.Succeeded)
                 return result;

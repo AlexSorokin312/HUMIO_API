@@ -31,6 +31,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Настраиваем Identity для работы с пользователями
 builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
+    options.User.AllowedUserNameCharacters =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+        "абвгдеёжзийклмнопрстуфхцчшщъыьэюя" +
+        "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
+        "0123456789-._@+";
+
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 0;
     options.Password.RequireNonAlphanumeric = false;
@@ -39,6 +45,8 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
+
+builder.Services.AddScoped<IUserValidator<User>, OptionalUserNameValidator<User>>();
 
 // Добавляем аутентификацию с JWT + Google
 builder.Services.AddAuthentication(options =>

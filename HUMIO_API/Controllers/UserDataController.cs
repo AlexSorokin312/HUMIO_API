@@ -142,13 +142,36 @@ public class UserDataController : ControllerBase
             });
         }
     }
-}
 
-/// <summary>
-/// Модель запроса для обновления даты окончания подписки.
-/// </summary>
-public class UpdateSubscriptionRequest
-{
-    public string UserId { get; set; }
-    public DateTime SubscriptionEndDate { get; set; }
+    /// <summary>
+    /// Обновляет дату окончания подписки пользователя по email.
+    /// </summary>
+    /// <param name="request">Модель запроса, содержащая email пользователя и новую дату окончания подписки.</param>
+    [HttpPut("update-subscription")]
+    public async Task<IActionResult> UpdateSubscription([FromBody] UpdateSubscriptionRequestByEmail request)
+    {
+        try
+        {
+            var response = await _userDataService.UpdateSubscriptionEndDateByEmailAsync(request.Email, request.SubscriptionEndDate);
+            if (response.Success)
+            {
+                Log.Information("Subscription end date updated successfully for email {Email}", request.Email);
+                return Ok(response);
+            }
+            else
+            {
+                Log.Warning("Failed to update subscription for email {Email}: {Message}", request.Email, response.Message);
+                return BadRequest(response);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error updating subscription for email {Email}", request.Email);
+            return BadRequest(new CommonResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+    }
 }

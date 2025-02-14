@@ -23,4 +23,5 @@ public interface IUserDataService
     Task<CommonResponse> RecordPurchaseAndUpdateSubscriptionAsync(string id, PurchaseRequest request);
 
     Task<bool> UserExistsAsync(string email);
+    Task<CommonResponse> UpdateSubscriptionEndDateByEmailAsync(string email, DateTime newSubscriptionEndDate);
 }

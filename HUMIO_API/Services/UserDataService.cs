@@ -144,4 +144,62 @@ public class UserDataService : IUserDataService
         Log.Information("UserExistsAsync: Пользователь с email {Email} {Exists}.", email, exists ? "найден" : "не найден");
         return exists;
     }
+
+    /// <summary>
+    /// ЭТОТ МЕТОД ТОЛЬКО ДЛЯ ИМПОРТА ПОЛЬЗОВАТЕЛЕЙ!!
+    /// </summary>
+    /// <param name="email"></param>
+    /// <param name="newSubscriptionEndDate"></param>
+    /// <returns></returns>
+    public async Task<CommonResponse> UpdateSubscriptionEndDateByEmailAsync(string email, DateTime newSubscriptionEndDate)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            Log.Warning("UpdateSubscriptionEndDateByEmailAsync: Передан пустой email.");
+            return new CommonResponse { Success = false, Message = "Email обязателен для обновления подписки." };
+        }
+
+        try
+        {
+            // Находим пользователя по email вместе с его данными (UserData)
+            var user = await _context.Users
+                .Include(u => u.UserData)
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+            {
+                Log.Warning("UpdateSubscriptionEndDateByEmailAsync: Пользователь с email {Email} не найден.", email);
+                return new CommonResponse { Success = false, Message = "Пользователь не найден." };
+            }
+
+            if (user.UserData == null)
+            {
+                Log.Warning("UpdateSubscriptionEndDateByEmailAsync: Данные пользователя для email {Email} не найдены.", email);
+                return new CommonResponse { Success = false, Message = "Данные пользователя не найдены." };
+            }
+
+            // Обновляем дату окончания подписки
+            user.UserData.SubscriptionEndDate = newSubscriptionEndDate;
+            _context.UserData.Update(user.UserData);
+
+            await _context.SaveChangesAsync();
+            Log.Information("UpdateSubscriptionEndDateByEmailAsync: Дата окончания подписки обновлена для пользователя {Email}.", email);
+
+            return new CommonResponse
+            {
+                Success = true,
+                Message = "Дата окончания подписки успешно обновлена."
+            };
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "UpdateSubscriptionEndDateByEmailAsync: Ошибка при обновлении подписки для пользователя {Email}.", email);
+            return new CommonResponse
+            {
+                Success = false,
+                Message = $"Ошибка: {ex.Message}"
+            };
+        }
+    }
+
 }

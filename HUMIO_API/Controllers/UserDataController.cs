@@ -20,13 +20,16 @@ public class UserDataController : ControllerBase
     [HttpGet("{userId}")]
     public async Task<IActionResult> GetUserById(string userId)
     {
+        Log.Information("GetUserById called with userId: {UserId}", userId);
         try
         {
             var userDto = await _userDataService.GetUserByIdAsync(userId);
+            Log.Information("GetUserById succeeded for userId: {UserId}", userId);
             return Ok(userDto);
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Error in GetUserById for userId: {UserId}", userId);
             return NotFound(ex.Message);
         }
     }
@@ -37,13 +40,16 @@ public class UserDataController : ControllerBase
     [HttpGet("email/{email}")]
     public async Task<IActionResult> GetUserByEmail(string email)
     {
+        Log.Information("GetUserByEmail called with email: {Email}", email);
         try
         {
             var userDto = await _userDataService.GetUserByEmailAsync(email);
+            Log.Information("GetUserByEmail succeeded for email: {Email}", email);
             return Ok(userDto);
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Error in GetUserByEmail for email: {Email}", email);
             return NotFound(ex.Message);
         }
     }
@@ -54,13 +60,16 @@ public class UserDataController : ControllerBase
     [HttpGet("{userId}/devices")]
     public async Task<IActionResult> GetUserDevices(string userId)
     {
+        Log.Information("GetUserDevices called for userId: {UserId}", userId);
         try
         {
             var devices = await _userDataService.GetUserDevicesAsync(userId);
+            Log.Information("GetUserDevices succeeded for userId: {UserId}. Device count: {Count}", userId, devices.Count);
             return Ok(devices);
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Error in GetUserDevices for userId: {UserId}", userId);
             return NotFound(ex.Message);
         }
     }
@@ -69,19 +78,16 @@ public class UserDataController : ControllerBase
     /// Записывает покупку и одновременно обновляет дату окончания подписки.
     /// Принимает PurchaseRequest, который включает цену покупки, дату покупки и новую дату окончания подписки.
     /// </summary>
-    /// <summary>
-    /// Записывает покупку и одновременно обновляет дату окончания подписки.
-    /// Принимает PurchaseRequest, который включает цену покупки, дату покупки и новую дату окончания подписки.
-    /// </summary>
     [HttpPost("purchase")]
     public async Task<IActionResult> RecordPurchase([FromBody] PurchaseRequest request)
     {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        Log.Information("RecordPurchase called for userId: {UserId} with request: {@Request}", userId, request);
         try
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
-                Log.Warning("Unauthorized access attempt in RecordPurchase");
+                Log.Warning("Unauthorized access attempt in RecordPurchase: missing userId");
                 return Unauthorized(new CommonResponse
                 {
                     Success = false,
@@ -90,8 +96,8 @@ public class UserDataController : ControllerBase
             }
 
             Log.Information("Recording purchase for user {UserId}", userId);
-
             var response = await _userDataService.RecordPurchaseAndUpdateSubscriptionAsync(userId, request);
+
             if (response.Success)
             {
                 Log.Information("Purchase recorded successfully for user {UserId}", userId);
@@ -105,7 +111,7 @@ public class UserDataController : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Error in RecordPurchase for user {UserId}", User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            Log.Error(ex, "Error in RecordPurchase for user {UserId}", userId);
             return BadRequest(new CommonResponse
             {
                 Success = false,
@@ -121,6 +127,7 @@ public class UserDataController : ControllerBase
     [HttpGet("exists/{email}")]
     public async Task<IActionResult> UserExists(string email)
     {
+        Log.Information("UserExists called for email: {Email}", email);
         try
         {
             bool exists = await _userDataService.UserExistsAsync(email);
@@ -134,7 +141,7 @@ public class UserDataController : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Ошибка при проверке существования пользователя с email {Email}.", email);
+            Log.Error(ex, "Ошибка при проверке существования пользователя с email {Email}", email);
             return BadRequest(new CommonResponse
             {
                 Success = false,
@@ -150,6 +157,7 @@ public class UserDataController : ControllerBase
     [HttpPut("update-subscription")]
     public async Task<IActionResult> UpdateSubscription([FromBody] UpdateSubscriptionRequestByEmail request)
     {
+        Log.Information("UpdateSubscription called for email: {Email} with new subscription end date: {SubscriptionEndDate}", request.Email, request.SubscriptionEndDate);
         try
         {
             var response = await _userDataService.UpdateSubscriptionEndDateByEmailAsync(request.Email, request.SubscriptionEndDate);

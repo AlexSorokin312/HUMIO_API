@@ -398,3 +398,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+HUMIO_API/appsettings.json
+HUMIO_API/appsettings.json
+HUMIO_API/appsettings.json
+HUMIO_API/appsettings.json

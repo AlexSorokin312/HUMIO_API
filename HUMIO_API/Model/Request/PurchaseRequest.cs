@@ -6,6 +6,6 @@
         public DateTime PurchaseDate { get; set; }
         public DateTime SubscriptionEndDate { get; set; }
         public int PaymentCount { get; set; }
-        public int Revenue { get; set; } = 0;
+        public decimal Revenue { get; set; }
     }
 }

@@ -1,4 +1,3 @@
-using System.Text;
 using HUMIO_API.DBContext;
 using HUMIO_API.Requests;
 using HUMIO_API.Services;
@@ -8,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 

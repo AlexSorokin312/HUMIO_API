@@ -70,6 +70,7 @@ public class UserDataService : IUserDataService
 
     public async Task<CommonResponse> RecordPurchaseAndUpdateSubscriptionAsync(string userId, PurchaseRequest request)
     {
+
         if (string.IsNullOrEmpty(userId))
             Log.Warning("User id is empty");
         using (var transaction = await _context.Database.BeginTransactionAsync())
@@ -89,6 +90,7 @@ public class UserDataService : IUserDataService
                 userData.PaymentCount = request.PaymentCount;
                 userData.Revenue = request.Revenue; 
                 _context.UserData.Update(userData);
+                Log.Information($"Revenue: {request.Revenue}");
 
                 var purchase = new Purchase
                 {

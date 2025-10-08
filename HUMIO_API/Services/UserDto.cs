@@ -14,6 +14,7 @@ public class UserDataDto
     public string Country { get; set; }
     public string Platform { get; set; }
     public int PaymentCount { get; set; }
+    public decimal Revenue { get; set; }
     public string UserName { get; set; }
     public DateTime TrialEndDate { get; set; }
     public DateTime? SubscriptionEndDate { get; set; }

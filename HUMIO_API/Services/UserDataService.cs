@@ -85,17 +85,17 @@ public class UserDataService : IUserDataService
                     return new CommonResponse { Success = false, Message = "User data not found" };
                 }
 
-                // Обновляем дату окончания подписки
                 userData.SubscriptionEndDate = request.SubscriptionEndDate;
+                userData.PaymentCount = request.PaymentCount;
+                userData.Revenue = request.Revenue; 
                 _context.UserData.Update(userData);
 
-                // Создаем запись покупки
                 var purchase = new Purchase
                 {
                     UserId = userId,
                     Price = request.Price,
                     PurchaseDate = request.PurchaseDate,
-                    SubscriptionEndDate = request.SubscriptionEndDate
+                    SubscriptionEndDate = request.SubscriptionEndDate,
                 };
                 _context.Purchases.Add(purchase);
 

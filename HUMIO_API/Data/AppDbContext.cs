@@ -59,7 +59,7 @@ namespace HUMIO_API.DBContext
 
             modelBuilder.Entity<PermanentPromoCodeUsage>()
                 .HasOne(ppcu => ppcu.User)
-                .WithMany()  
+                .WithMany()
                 .HasForeignKey(ppcu => ppcu.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
@@ -75,15 +75,13 @@ namespace HUMIO_API.DBContext
 
             modelBuilder.Entity<PasswordReset>()
                 .HasOne(pr => pr.User)
-                .WithMany() 
+                .WithMany()
                 .HasForeignKey(pr => pr.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<PasswordReset>()
                 .HasIndex(pr => pr.ResetCode)
                 .IsUnique();
-
-
         }
     }
 }

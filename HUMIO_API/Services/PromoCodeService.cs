@@ -77,7 +77,22 @@ namespace HUMIO_API.Services
         }
 
         /// <summary>
-        /// Применяет постоянный промокод: проверяет, не использовал ли пользователь, обновляет TrialEndDate и регистрирует использование.
+        /// Обновляет поле SubscriptionEndDate в UserData, прибавляя указанное число дней.
+        /// </summary>
+        private void UpdateSubscriptionEndDate(UserData userData, int extensionDays)
+        {
+            if (userData.SubscriptionEndDate.HasValue)
+            {
+                userData.SubscriptionEndDate = userData.SubscriptionEndDate.Value.AddDays(extensionDays);
+            }
+            else
+            {
+                userData.SubscriptionEndDate = DateTime.UtcNow.AddDays(extensionDays);
+            }
+        }
+
+        /// <summary>
+        /// Применяет постоянный промокод: проверяет, не использовал ли пользователь, обновляет TrialEndDate и SubscriptionEndDate и регистрирует использование.
         /// </summary>
         private async Task<CommonResponse> ApplyPermanentPromoCodeAsync(User user, PermanentPromoCode permCode, string userId, IDbContextTransaction transaction)
         {
@@ -89,7 +104,10 @@ namespace HUMIO_API.Services
                 return new CommonResponse { Success = false, Message = "Promo code has already been used by this user." };
             }
 
+            // Обновляем даты окончания пробного периода и подписки
             UpdateTrialEndDate(user.UserData, permCode.ExtensionDays);
+            UpdateSubscriptionEndDate(user.UserData, permCode.ExtensionDays);
+
             _context.UserData.Update(user.UserData);
 
             var usage = new PermanentPromoCodeUsage
@@ -111,14 +129,17 @@ namespace HUMIO_API.Services
         }
 
         /// <summary>
-        /// Применяет временный промокод: обновляет TrialEndDate, удаляет промокод.
+        /// Применяет временный промокод: обновляет TrialEndDate, SubscriptionEndDate, удаляет промокод.
         /// </summary>
         private async Task<CommonResponse> ApplyTemporaryPromoCodeAsync(User user, TemporaryPromoCode tempCode, IDbContextTransaction transaction)
         {
+            // Обновляем даты окончания пробного периода и подписки
             UpdateTrialEndDate(user.UserData, tempCode.ExtensionDays);
+            UpdateSubscriptionEndDate(user.UserData, tempCode.ExtensionDays);
+
             _context.UserData.Update(user.UserData);
 
-            // Удаляем временный промокод, т.к. он разовый
+            // Удаляем временный промокод, так как он разовый
             _context.TemporaryPromoCodes.Remove(tempCode);
 
             await _context.SaveChangesAsync();

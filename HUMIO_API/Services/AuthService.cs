@@ -229,6 +229,82 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<TokenResponse> GoogleAuthWithoutTokenAsync(GoogleAuthWithoutTokenRequest request)
+    {
+        using (var transaction = await _context.Database.BeginTransactionAsync())
+        {
+            try
+            {
+                Log.Information("Запрос данных пользователя из Google. Почта: {Email}, GoogleId: {GoogleId}", request.Email, request.GoogleId);
+
+                // Проверяем, что данные пользователя корректны
+                if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.GoogleId))
+                {
+                    Log.Warning("Не удалось получить данные пользователя от Google. Почта или GoogleId пустые.");
+                    throw new ArgumentException("Не удалось получить данные пользователя от Google.");
+                }
+
+                // Ищем пользователя в системе по переданным данным
+                var user = await _userManager.FindByEmailAsync(request.Email);
+
+                if (user == null)
+                {
+                    // Если пользователь не найден, создаем нового
+                    Log.Information("Создание нового пользователя {Email}", request.Email);
+                    user = new User
+                    {
+                        UserName = request.Email,
+                        Name = request.Name,
+                        Email = request.Email,
+                        GoogleId = request.GoogleId,
+                        UserData = new UserData
+                        {
+                            UserName = request.Name,
+                            Country = request.Country ?? "Unknown",
+                            Platform = request.Platform,
+                            PaymentCount = 0,
+                            SubscriptionEndDate = null,
+                        }
+                    };
+
+                    var createResult = await _userManager.CreateAsync(user);
+                    if (!createResult.Succeeded)
+                    {
+                        var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                        Log.Error("Ошибка при создании пользователя: {Errors}", errors);
+                        throw new InvalidOperationException("Ошибка при создании пользователя: " + errors);
+                    }
+                    Log.Information("Пользователь {Email} успешно создан", request.Email);
+                }
+                else
+                {
+                    // Если пользователь уже существует
+                    Log.Information("Пользователь {Email} уже существует", request.Email);
+                }
+
+                // Привязываем пользователя к устройству
+                await BindUserToExistingDeviceAsync(user, request.DeviceIdentifier);
+                Log.Information("Пользователь {Email} привязан к устройству {DeviceId}", request.Email, request.DeviceIdentifier);
+
+                // Генерируем JWT токены для пользователя
+                var tokens = await GenerateJwtTokens(user);
+                Log.Information("JWT токены успешно сгенерированы для {Email}", request.Email);
+
+                // Коммитим транзакцию, так как все операции прошли успешно
+                await transaction.CommitAsync();
+
+                return tokens;
+            }
+            catch (Exception ex)
+            {
+                // Если возникает ошибка, откатываем транзакцию
+                await transaction.RollbackAsync();
+                Log.Error(ex, "Ошибка при Google аутентификации");
+                throw new Exception("Ошибка при Google аутентификации: " + ex.Message, ex);
+            }
+        }
+    }
+
 
     public async Task<UserDto> GetUserAsync(string userId)
     {

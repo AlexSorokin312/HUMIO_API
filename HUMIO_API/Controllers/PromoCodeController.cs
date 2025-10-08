@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace HUMIO_API.Controllers
 {
@@ -21,10 +23,21 @@ namespace HUMIO_API.Controllers
         /// <param name="request">Объект запроса с данными для применения промокода.</param>
         /// <returns>Результат операции.</returns>
         [HttpPost("apply")]
+        [Authorize] // Применяем авторизацию по токену
         public async Task<IActionResult> ApplyPromoCode([FromBody] ApplyPromoCodeRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            // Извлекаем UserId из токена
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { message = "User not authorized" });
+            }
+
+            // Обновляем объект запроса, добавляя UserId
+            request.UserId = userId;
 
             var response = await _promoCodeService.ApplyPromoCodeAsync(request);
 

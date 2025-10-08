@@ -22,9 +22,9 @@ namespace HUMIO_API.Services
         Task<bool> DeleteAnonymousDeviceAsync(string deviceId);
     }
 
-        public class DeviceService : IDeviceService
-        {
-        private const int trial_days = 3;
+    public class DeviceService : IDeviceService
+    {
+        private const int trial_days = 1;
         private readonly AppDbContext _context;
         private readonly IMapper _mapper;
 
@@ -68,27 +68,27 @@ namespace HUMIO_API.Services
 
 
         public async Task<bool> DeleteAnonymousDeviceAsync(string deviceId)
+        {
+            // Находим запись по DeviceId
+            var device = await _context.DeviceIdentifiers
+                .Include(d => d.UserDevices)
+                .FirstOrDefaultAsync(d => d.DeviceId == deviceId);
+
+            if (device == null)
             {
-                // Находим запись по DeviceId
-                var device = await _context.DeviceIdentifiers
-                    .Include(d => d.UserDevices)
-                    .FirstOrDefaultAsync(d => d.DeviceId == deviceId);
-
-                if (device == null)
-                {
-                    // Запись не найдена.
-                    return false;
-                }
-
-                // Если устройство связано с каким-либо зарегистрированным пользователем, то удалять нельзя.
-                if (device.UserDevices != null && device.UserDevices.Any())
-                {
-                    return false;
-                }
-
-                _context.DeviceIdentifiers.Remove(device);
-                await _context.SaveChangesAsync();
-                return true;
+                // Запись не найдена.
+                return false;
             }
+
+            // Если устройство связано с каким-либо зарегистрированным пользователем, то удалять нельзя.
+            if (device.UserDevices != null && device.UserDevices.Any())
+            {
+                return false;
+            }
+
+            _context.DeviceIdentifiers.Remove(device);
+            await _context.SaveChangesAsync();
+            return true;
         }
+    }
 }

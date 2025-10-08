@@ -82,7 +82,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IUserDataService, UserDataService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
-
+builder.Services.AddScoped<IPromoCodeService, PromoCodeService>();
 
 builder.Services.AddAuthorization();
 

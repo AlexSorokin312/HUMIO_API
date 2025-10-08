@@ -91,6 +91,25 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("google-no-token")]
+    public async Task<IActionResult> GoogleAuthWithoutToken([FromBody] GoogleAuthWithoutTokenRequest request)
+    {
+        try
+        {
+            Log.Information("Начало Google аутентификации без токена для пользователя: {Email}, GoogleId: {GoogleId}", request.Email, request.GoogleId);
+
+            // Вызов метода аутентификации без токена
+            var token = await _authService.GoogleAuthWithoutTokenAsync(request);
+
+            return Ok(new { accessToken = token.AccessToken, refreshToken = token.RefreshToken });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Ошибка при Google аутентификации без токена");
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [Authorize]
     [HttpGet("user")]
     public async Task<IActionResult> GetCurrentUserByToken()

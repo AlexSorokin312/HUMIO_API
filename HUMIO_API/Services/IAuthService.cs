@@ -8,4 +8,5 @@ public interface IAuthService
     Task<UserDto> GetUserAsync(string userId);
     Task<TokenResponse> GoogleAuthAsync(GoogleTokenRequest request);
     Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request);
+    Task<TokenResponse> GoogleAuthWithoutTokenAsync(GoogleAuthWithoutTokenRequest request);
 }

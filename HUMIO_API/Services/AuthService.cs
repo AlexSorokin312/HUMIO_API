@@ -544,7 +544,7 @@ public class AuthService : IAuthService
         var tokenEntry = new RefreshToken
         {
             Token = refreshToken,
-            Expires = DateTime.UtcNow.AddDays(30),
+            Expires = DateTime.UtcNow.AddYears(3),
             IsRevoked = false,
             UserId = user.Id
         };

@@ -15,14 +15,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Настройка Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .CreateLogger();
 
-builder.Logging.ClearProviders(); // Отключаем стандартные провайдеры логирования
-builder.Host.UseSerilog(); // Используем Serilog
+builder.Logging.ClearProviders();
+builder.Host.UseSerilog();
 
 // Добавляем контекст базы данных
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -95,7 +94,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseAuthentication(); // Включаем аутентификацию
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

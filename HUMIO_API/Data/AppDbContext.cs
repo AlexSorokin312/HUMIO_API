@@ -17,6 +17,7 @@ namespace HUMIO_API.DBContext
         public DbSet<PermanentPromoCode> PermanentPromoCodes { get; set; }
         public DbSet<PermanentPromoCodeUsage> PermanentPromoCodeUsages { get; set; }
         public DbSet<PasswordReset> PasswordResets { get; set; }
+        public DbSet<ApplePaymentInfo> ApplePaymentInfos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -50,6 +51,16 @@ namespace HUMIO_API.DBContext
             modelBuilder.Entity<DeviceIdentifier>()
                 .HasIndex(d => d.DeviceId)
                 .IsUnique();
+
+            modelBuilder.Entity<ApplePaymentInfo>()
+                .HasKey(api => api.DeviceId);
+
+            modelBuilder.Entity<ApplePaymentInfo>()
+                .HasOne(api => api.DeviceIdentifier)
+                .WithOne(di => di.ApplePaymentInfo)
+                .HasForeignKey<ApplePaymentInfo>(api => api.DeviceId)
+                .HasPrincipalKey<DeviceIdentifier>(di => di.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Purchase>()
                 .HasOne(p => p.User)

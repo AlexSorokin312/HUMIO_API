@@ -1,4 +1,4 @@
-using HUMIO_API.DBContext;
+п»їusing HUMIO_API.DBContext;
 using HUMIO_API.Requests;
 using HUMIO_API.Services;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -23,17 +23,17 @@ Log.Logger = new LoggerConfiguration()
 builder.Logging.ClearProviders();
 builder.Host.UseSerilog();
 
-// Добавляем контекст базы данных
+// Р”РѕР±Р°РІР»СЏРµРј РєРѕРЅС‚РµРєСЃС‚ Р±Р°Р·С‹ РґР°РЅРЅС‹С…
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Настраиваем Identity для работы с пользователями
+// РќР°СЃС‚СЂР°РёРІР°РµРј Identity РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё
 builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
     options.User.AllowedUserNameCharacters =
         "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-        "абвгдеёжзийклмнопрстуфхцчшщъыьэюя" +
-        "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
+        "Р°Р±РІРіРґРµС‘Р¶Р·РёР№РєР»РјРЅРѕРїСЂСЃС‚СѓС„С…С†С‡С€С‰СЉС‹СЊСЌСЋСЏ" +
+        "РђР‘Р’Р“Р”Р•РЃР–Р—РР™РљР›РњРќРћРџР РЎРўРЈР¤РҐР¦Р§РЁР©РЄР«Р¬Р­Р®РЇ" +
         "0123456789-._@+";
 
     options.Password.RequireDigit = false;
@@ -47,7 +47,7 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 
 builder.Services.AddScoped<IUserValidator<User>, OptionalUserNameValidator<User>>();
 
-// Добавляем аутентификацию с JWT + Google
+// Р”РѕР±Р°РІР»СЏРµРј Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёСЋ СЃ JWT + Google
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -82,6 +82,7 @@ builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IUserDataService, UserDataService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IPromoCodeService, PromoCodeService>();
+builder.Services.AddScoped<IApplePaymentInfoService, ApplePaymentInfoService>();
 
 builder.Services.AddAuthorization();
 

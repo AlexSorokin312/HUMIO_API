@@ -41,6 +41,7 @@ namespace HUMIO_API.Requests
         public string Country { get; set; }
         public string Platform { get; set; }
         public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
+        public ApplePaymentInfo ApplePaymentInfo { get; set; }
     }
 
     public class DeviceIdentifierResponce
@@ -137,5 +138,17 @@ namespace HUMIO_API.Requests
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         [Required]
         public DateTime ExpiresAt { get; set; }
+    }
+
+    public class ApplePaymentInfo
+    {
+        [Key]
+        [ForeignKey("DeviceIdentifier")]
+        public string DeviceId { get; set; }
+        public string Country { get; set; }
+        public int PaymentCount { get; set; }
+        public DateTime? SubscriptionEndDate { get; set; }
+        public decimal Revenue { get; set; }
+        public DeviceIdentifier DeviceIdentifier { get; set; }
     }
 }

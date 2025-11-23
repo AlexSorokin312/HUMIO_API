@@ -78,5 +78,17 @@ namespace HUMIO_API.Controllers
                 return NotFound(new { message = ex.Message });
             }
         }
+
+        [HttpDelete("{deviceId}")]
+        public async Task<IActionResult> Delete(string deviceId)
+        {
+            var deleted = await _service.DeleteAsync(deviceId);
+            if (!deleted)
+            {
+                return NotFound(new { message = "ApplePaymentInfo not found for device" });
+            }
+
+            return NoContent();
+        }
     }
 }

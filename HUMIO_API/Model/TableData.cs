@@ -1,6 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
+using System.Text.Json.Serialization;
 
 namespace HUMIO_API.Requests
 {
@@ -40,7 +41,9 @@ namespace HUMIO_API.Requests
         public DateTime? TrialEndDate { get; set; }
         public string Country { get; set; }
         public string Platform { get; set; }
+        [JsonIgnore]
         public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
+        [JsonIgnore]
         public ApplePaymentInfo ApplePaymentInfo { get; set; }
     }
 
@@ -56,6 +59,7 @@ namespace HUMIO_API.Requests
         public string Country { get; set; }
         public string Platform { get; set; }
         public bool IsFirstLaunch { get; set; }
+        [JsonIgnore]
         public ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
     }
 
@@ -71,6 +75,7 @@ namespace HUMIO_API.Requests
         public int DeviceId { get; set; }
 
         public User User { get; set; }
+        [JsonIgnore]
         public DeviceIdentifier DeviceIdentifier { get; set; }
     }
 
@@ -149,6 +154,7 @@ namespace HUMIO_API.Requests
         public int PaymentCount { get; set; }
         public DateTime? SubscriptionEndDate { get; set; }
         public decimal Revenue { get; set; }
+        [JsonIgnore]
         public DeviceIdentifier DeviceIdentifier { get; set; }
     }
 }

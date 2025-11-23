@@ -13,7 +13,7 @@ namespace HUMIO_API.Controllers
         {
             _deviceService = deviceService;
         }
-
+        
         /// <summary>
         /// Возвращает существующую запись DeviceIdentifier или создаёт новую,
         /// если записи с данным DeviceId ещё нет.
